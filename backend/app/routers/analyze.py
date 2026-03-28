@@ -1,6 +1,7 @@
 """Analysis endpoint — single Gemini call with SSE and caching."""
 
 import asyncio
+import collections
 import hashlib
 import json
 import logging
@@ -19,8 +20,9 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["analysis"])
 
-# In-memory response cache
-_cache: dict[str, dict] = {}
+# LRU cache with max 128 entries to prevent unbounded memory growth
+MAX_CACHE_SIZE = 128
+_cache: collections.OrderedDict[str, dict] = collections.OrderedDict()
 
 ALLOWED_MIME_TYPES = {
     "image/jpeg", "image/png", "image/webp", "image/gif",
@@ -38,10 +40,20 @@ def _validate_file(file: UploadFile) -> None:
 
 
 def _cache_key(text: str, sizes: list[int]) -> str:
+    """Generate a short hash key from input text and file sizes."""
     return hashlib.sha256(f"{text}|{'|'.join(map(str, sizes))}".encode()).hexdigest()[:16]
 
 
+def _cache_set(key: str, value: dict) -> None:
+    """Add to cache with LRU eviction."""
+    _cache[key] = value
+    _cache.move_to_end(key)
+    while len(_cache) > MAX_CACHE_SIZE:
+        _cache.popitem(last=False)
+
+
 def _sse(event: str, data: dict) -> str:
+    """Format a Server-Sent Event string."""
     return f"event: {event}\ndata: {json.dumps(data)}\n\n"
 
 
@@ -102,7 +114,7 @@ async def analyze_stream(
                 "action_plan": action_plan.model_dump(),
             }
 
-            _cache[key] = result
+            _cache_set(key, result)
 
             # Fire-and-forget Firestore save
             asyncio.create_task(save_session(
@@ -137,7 +149,7 @@ async def analyze_sync(
         action_plan = await gemini_analyze(parts)
         session_id = str(uuid4())
         result = {"session_id": session_id, "action_plan": action_plan.model_dump()}
-        _cache[key] = result
+        _cache_set(key, result)
         await save_session(session_id=session_id, intake_data={}, action_plan=action_plan.model_dump())
         return result
     except Exception as e:

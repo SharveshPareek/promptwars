@@ -57,7 +57,8 @@ export const FileUpload: React.FC<FileUploadProps> = ({
         Upload files (images, audio, PDFs)
       </label>
 
-      <div
+      <button
+        type="button"
         onDrop={handleDrop}
         onDragOver={(e) => {
           e.preventDefault();
@@ -65,17 +66,9 @@ export const FileUpload: React.FC<FileUploadProps> = ({
         }}
         onDragLeave={() => setIsDragging(false)}
         onClick={() => inputRef.current?.click()}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            inputRef.current?.click();
-          }
-        }}
-        role="button"
-        tabIndex={0}
         aria-label="Drop files here or click to upload"
         className={clsx(
-          'border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all duration-200',
+          'w-full border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all duration-200',
           isDragging
             ? 'border-blue-500 bg-blue-50'
             : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50'
@@ -98,7 +91,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({
         <p className="text-gray-400 text-sm mt-1">
           Images, audio recordings, or PDFs (max {maxSizeMB}MB)
         </p>
-      </div>
+      </button>
 
       {error && (
         <p className="text-red-600 text-sm mt-2" role="alert">

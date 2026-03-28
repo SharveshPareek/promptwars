@@ -65,7 +65,7 @@ class TestActionItem:
     def test_valid_action(self):
         action = ActionItem(
             priority=1,
-            action="Call 911 immediately",
+            action="Call 108 immediately",
             reasoning="Patient showing signs of cardiac event",
             confidence=0.95,
             source="AHA ACLS Guidelines",
@@ -114,7 +114,7 @@ class TestActionPlan:
             ],
             what_not_to_do=["Do not give additional medication"],
             call_emergency=False,
-            emergency_number="911",
+            emergency_number="108",
             verification_sources=["FDA", "WebMD"],
             confidence_overall=0.85,
         )
@@ -129,7 +129,7 @@ class TestActionPlan:
                 verified_actions=[],
                 what_not_to_do=[],
                 call_emergency=False,
-                emergency_number="911",
+                emergency_number="108",
                 verification_sources=[],
                 confidence_overall=0.5,
             )

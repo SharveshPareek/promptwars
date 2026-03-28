@@ -8,7 +8,6 @@ from google.genai import types
 from google.genai.errors import ClientError
 
 from app.config import settings
-from app.models.intake import IntakeResult
 from app.models.actions import ActionPlan
 
 logger = logging.getLogger(__name__)

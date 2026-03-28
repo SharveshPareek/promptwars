@@ -84,7 +84,11 @@
       "Bash(curl -s -X POST https://crisislens-api-713762440139.us-central1.run.app/api/analyze -F \"text=My grandmother took aspirin and ibuprofen together. She feels dizzy and nauseous. She is 78.\" --max-time 120)",
       "Bash(curl -s -X POST https://crisislens-api-713762440139.us-central1.run.app/api/analyze -F \"text=My grandmother took aspirin and ibuprofen together. She feels dizzy and nauseous with ringing in her ears. She is 78 and takes lisinopril.\" --max-time 180)",
       "Bash(curl -s -X POST https://crisislens-api-713762440139.us-central1.run.app/api/analyze -F \"text=Elderly man collapsed at a park, not breathing, no pulse\" --max-time 180)",
-      "Bash(curl -s -X POST https://crisislens-api-713762440139.us-central1.run.app/api/analyze -F \"text=A 3 year old child drank household bleach. He is crying with a red irritated mouth.\" --max-time 180)"
+      "Bash(curl -s -X POST https://crisislens-api-713762440139.us-central1.run.app/api/analyze -F \"text=A 3 year old child drank household bleach. He is crying with a red irritated mouth.\" --max-time 180)",
+      "Bash(lsof -i :5173)",
+      "Bash(\"/c/Users/Admin/AppData/Local/Google/Cloud SDK/google-cloud-sdk/bin/gcloud\" run revisions list --service crisislens-api --region us-central1 --project coral-balancer-491605-i0 --limit 2)",
+      "mcp__playwright__playwright_navigate",
+      "Bash(npx playwright install chromium)"
     ]
   }
 }

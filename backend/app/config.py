@@ -1,11 +1,15 @@
 """Application configuration using Pydantic Settings."""
 
-from pydantic_settings import BaseSettings
 from typing import Optional
+
+from pydantic import ConfigDict
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
     """Load configuration from environment variables."""
+
+    model_config = ConfigDict(env_file=".env", case_sensitive=False)
 
     # GCP
     gcp_project_id: str = "coral-balancer-491605-i0"
@@ -23,10 +27,6 @@ class Settings(BaseSettings):
     # Limits
     max_file_size_mb: int = 50
     rate_limit: str = "10/minute"
-
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
 
     @property
     def allowed_origins_list(self) -> list[str]:
