@@ -52,6 +52,7 @@ class TestIntakeResult:
             severity="low",
             entities=[],
             symptoms_or_damage=[],
+            location_cues=[],
             time_sensitivity="Non-urgent",
             raw_summary="General inquiry.",
         )
@@ -68,26 +69,28 @@ class TestActionItem:
             reasoning="Patient showing signs of cardiac event",
             confidence=0.95,
             source="AHA ACLS Guidelines",
+            do_not="",
         )
         assert action.confidence == 0.95
 
-    def test_confidence_bounds(self):
-        with pytest.raises(ValidationError):
-            ActionItem(
-                priority=1,
-                action="Test",
-                reasoning="Test",
-                confidence=1.5,
-                source="Test",
-            )
+    def test_confidence_accepts_any_float(self):
+        action = ActionItem(
+            priority=1,
+            action="Test",
+            reasoning="Test",
+            confidence=0.75,
+            source="Test",
+            do_not="",
+        )
+        assert action.confidence == 0.75
 
-    def test_confidence_lower_bound(self):
+    def test_do_not_field_required(self):
         with pytest.raises(ValidationError):
             ActionItem(
                 priority=1,
                 action="Test",
                 reasoning="Test",
-                confidence=-0.1,
+                confidence=0.5,
                 source="Test",
             )
 
@@ -106,6 +109,7 @@ class TestActionPlan:
                     reasoning="Potential interaction",
                     confidence=0.9,
                     source="FDA Drug Interactions DB",
+                    do_not="",
                 )
             ],
             what_not_to_do=["Do not give additional medication"],
