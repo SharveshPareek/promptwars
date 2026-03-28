@@ -34,7 +34,7 @@ async def _generate_with_retry(**kwargs):
     """Call Gemini with automatic retry on rate limit (429) errors."""
     for attempt in range(MAX_RETRIES):
         try:
-            return await _generate_with_retry(**kwargs)
+            return await client.aio.models.generate_content(**kwargs)
         except ClientError as e:
             if "429" in str(e) and attempt < MAX_RETRIES - 1:
                 wait = RETRY_DELAY_SECONDS * (attempt + 1)
