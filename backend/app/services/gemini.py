@@ -16,15 +16,17 @@ from app.models.actions import ActionPlan, ReasoningResult
 logger = logging.getLogger(__name__)
 
 # Initialize Gemini client
-# Supports both Vertex AI (GCP auth) and API key modes
-if settings.google_api_key:
-    client = genai.Client(api_key=settings.google_api_key)
-else:
-    client = genai.Client(
-        vertexai=True,
-        project=settings.gcp_project_id,
-        location=settings.gcp_location,
+# Strictly force Vertex AI mode with explicit aiplatform base URL
+# Works around google-genai SDK bug routing to generativelanguage by mistake
+client = genai.Client(
+    vertexai=True,
+    project=settings.gcp_project_id,
+    location=settings.gcp_location,
+    http_options=types.HttpOptions(
+        api_version="v1",
+        base_url=f"https://{settings.gcp_location}-aiplatform.googleapis.com",
     )
+)
 
 MAX_RETRIES = 3
 RETRY_DELAY_SECONDS = 6
