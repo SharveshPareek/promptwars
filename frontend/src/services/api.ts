@@ -4,7 +4,7 @@ import axios from 'axios';
 import type { AnalysisResponse } from '../types';
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || '/api',
+  baseURL: import.meta.env.VITE_API_URL || 'https://crisislens-api-713762440139.us-central1.run.app/api',
   timeout: 120000, // 2 minutes — Gemini pipelines can take time
 });
 
