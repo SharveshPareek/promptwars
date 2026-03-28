@@ -32,7 +32,7 @@ export interface ActionPlan {
 
 export interface AnalysisResponse {
   session_id: string;
-  intake: IntakeResult;
+  intake?: IntakeResult;
   action_plan: ActionPlan;
 }
 

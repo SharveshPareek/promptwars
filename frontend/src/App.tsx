@@ -6,7 +6,7 @@ import { ActionPanel } from './components/ActionPanel';
 import { useAnalyze } from './hooks/useAnalyze';
 
 function App() {
-  const { result, intake, loading, stage, stageMessage, error, analyze } = useAnalyze();
+  const { result, loading, stage, stageMessage, error, analyze } = useAnalyze();
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -30,7 +30,6 @@ function App() {
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 overflow-y-auto">
             <ActionPanel
               result={result}
-              intake={intake}
               loading={loading}
               stage={stage}
               stageMessage={stageMessage}

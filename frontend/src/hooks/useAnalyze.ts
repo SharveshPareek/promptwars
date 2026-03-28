@@ -1,12 +1,11 @@
-/** Hook for SSE-based progressive analysis. */
+/** Hook for SSE-based analysis with progressive status. */
 
 import { useState, useCallback } from 'react';
-import type { AnalysisResponse, IntakeResult } from '../types';
+import type { AnalysisResponse } from '../types';
 import { analyzeStream } from '../services/api';
 
 interface UseAnalyzeReturn {
   result: AnalysisResponse | null;
-  intake: IntakeResult | null;
   loading: boolean;
   stage: string;
   stageMessage: string;
@@ -17,7 +16,6 @@ interface UseAnalyzeReturn {
 
 export function useAnalyze(): UseAnalyzeReturn {
   const [result, setResult] = useState<AnalysisResponse | null>(null);
-  const [intake, setIntake] = useState<IntakeResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [stage, setStage] = useState('');
   const [stageMessage, setStageMessage] = useState('');
@@ -27,9 +25,8 @@ export function useAnalyze(): UseAnalyzeReturn {
     setLoading(true);
     setError(null);
     setResult(null);
-    setIntake(null);
-    setStage('starting');
-    setStageMessage('Connecting...');
+    setStage('analyzing');
+    setStageMessage('Connecting to Gemini AI...');
 
     try {
       await analyzeStream(text, files, {
@@ -37,13 +34,9 @@ export function useAnalyze(): UseAnalyzeReturn {
           setStage(s);
           setStageMessage(msg);
         },
-        onIntake: (data) => {
-          setIntake(data);
-          setStage('reasoning');
-        },
+        onIntake: () => {},
         onResult: (data) => {
           setResult(data);
-          setIntake(data.intake);
           setLoading(false);
           setStage('done');
         },
@@ -52,7 +45,6 @@ export function useAnalyze(): UseAnalyzeReturn {
           setLoading(false);
         },
       });
-      // If stream ended without result or error
       setLoading(false);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Analysis failed.');
@@ -62,12 +54,11 @@ export function useAnalyze(): UseAnalyzeReturn {
 
   const reset = useCallback(() => {
     setResult(null);
-    setIntake(null);
     setError(null);
     setLoading(false);
     setStage('');
     setStageMessage('');
   }, []);
 
-  return { result, intake, loading, stage, stageMessage, error, analyze, reset };
+  return { result, loading, stage, stageMessage, error, analyze, reset };
 }
