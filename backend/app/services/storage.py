@@ -1,13 +1,13 @@
 """Google Cloud Storage service for file uploads."""
 
 import logging
-from typing import Optional
 
+from google.api_core.exceptions import GoogleAPIError
 from google.cloud import storage
 
 from app.config import settings
 
-logger = logging.getLogger(__name__)
+logger: logging.Logger = logging.getLogger(__name__)
 
 
 def _get_client() -> storage.Client:
@@ -32,16 +32,19 @@ def upload_file(
 
     Returns:
         GCS URI string (gs://bucket/path).
+
+    Raises:
+        GoogleAPIError: If the upload to GCS fails.
     """
     try:
-        client = _get_client()
+        client: storage.Client = _get_client()
         bucket = client.bucket(settings.gcs_bucket_name)
         blob = bucket.blob(destination_path)
         blob.upload_from_string(file_content, content_type=content_type)
 
-        gcs_uri = f"gs://{settings.gcs_bucket_name}/{destination_path}"
-        logger.info(f"Uploaded file to {gcs_uri}")
+        gcs_uri: str = f"gs://{settings.gcs_bucket_name}/{destination_path}"
+        logger.info("Uploaded file to %s", gcs_uri)
         return gcs_uri
-    except Exception as e:
-        logger.error(f"Failed to upload to GCS: {e}")
+    except (GoogleAPIError, OSError) as e:
+        logger.error("Failed to upload to GCS: %s", e)
         raise

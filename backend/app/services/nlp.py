@@ -1,14 +1,13 @@
-"""Google Cloud NLP services — Translation and Natural Language analysis."""
+"""Google Cloud NLP services -- Translation and Natural Language analysis."""
 
 import logging
 from typing import Optional
 
-from google.cloud import translate_v2 as translate
+from google.api_core.exceptions import GoogleAPIError
 from google.cloud import language_v2
+from google.cloud import translate_v2 as translate
 
-from app.config import settings
-
-logger = logging.getLogger(__name__)
+logger: logging.Logger = logging.getLogger(__name__)
 
 # Lazy-initialized clients
 _translate_client: Optional[translate.Client] = None
@@ -33,7 +32,7 @@ def _get_language_client() -> language_v2.LanguageServiceAsyncClient:
     return _language_client
 
 
-def translate_text(text: str, target_language: str = "es") -> dict:
+def translate_text(text: str, target_language: str = "es") -> dict[str, str]:
     """Translate text using Cloud Translation API.
 
     Args:
@@ -42,44 +41,53 @@ def translate_text(text: str, target_language: str = "es") -> dict:
 
     Returns:
         Dict with translated text and detected source language.
+
+    Raises:
+        GoogleAPIError: If the Cloud Translation API call fails.
     """
     try:
-        client = _get_translate_client()
-        result = client.translate(text, target_language=target_language)
-        logger.info(f"Translated to {target_language}: {result['detectedSourceLanguage']}")
+        client: translate.Client = _get_translate_client()
+        result: dict = client.translate(text, target_language=target_language)
+        logger.info(
+            "Translated to %s: %s", target_language, result["detectedSourceLanguage"]
+        )
         return {
             "translated_text": result["translatedText"],
             "source_language": result["detectedSourceLanguage"],
             "target_language": target_language,
         }
-    except Exception as e:
-        logger.error(f"Translation failed: {e}")
+    except (GoogleAPIError, KeyError, ValueError) as e:
+        logger.error("Translation failed: %s", e)
         raise
 
 
-async def analyze_entities(text: str) -> list[dict]:
+async def analyze_entities(text: str) -> list[dict[str, str]]:
     """Extract entities from text using Cloud Natural Language API.
 
-    Returns list of entities with name, type, and salience score.
+    Returns:
+        List of entities with name and type fields.
+
+    Raises:
+        GoogleAPIError: If the Cloud Natural Language API call fails.
     """
     try:
-        client = _get_language_client()
-        document = language_v2.Document(
+        client: language_v2.LanguageServiceAsyncClient = _get_language_client()
+        document: language_v2.Document = language_v2.Document(
             content=text,
             type_=language_v2.Document.Type.PLAIN_TEXT,
         )
         response = await client.analyze_entities(
             request={"document": document}
         )
-        entities = [
+        entities: list[dict[str, str]] = [
             {
                 "name": entity.name,
                 "type": language_v2.Entity.Type(entity.type_).name,
             }
             for entity in response.entities
         ]
-        logger.info(f"Extracted {len(entities)} entities via Cloud NLP")
+        logger.info("Extracted %d entities via Cloud NLP", len(entities))
         return entities
-    except Exception as e:
-        logger.error(f"Entity analysis failed: {e}")
+    except (GoogleAPIError, ValueError) as e:
+        logger.error("Entity analysis failed: %s", e)
         raise

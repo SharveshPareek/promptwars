@@ -91,7 +91,11 @@
       "Bash(npx playwright install chromium)",
       "Bash(\"/c/Users/Admin/AppData/Local/Google/Cloud SDK/google-cloud-sdk/bin/gcloud\" services enable translate.googleapis.com language.googleapis.com --project coral-balancer-491605-i0)",
       "Bash(pip install google-cloud-translate==3.18.0 google-cloud-language==2.15.0)",
-      "Bash(python -m pytest tests/ -v --tb=short)"
+      "Bash(python -m pytest tests/ -v --tb=short)",
+      "Bash(npx vitest run --reporter=verbose)",
+      "Bash(python -m pytest tests/ -v --tb=long)",
+      "Bash(.venv/Scripts/python.exe -m pytest tests/ -v --tb=long)",
+      "Bash(.venv/Scripts/python.exe -m pytest tests/ -v --tb=short)"
     ]
   }
 }

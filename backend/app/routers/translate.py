@@ -1,16 +1,16 @@
 """Translation endpoint using Cloud Translation API."""
 
 import logging
-from typing import Optional
 
 from fastapi import APIRouter, HTTPException
+from google.api_core.exceptions import GoogleAPIError
 from pydantic import BaseModel, Field
 
-from app.services.nlp import translate_text, analyze_entities
+from app.services.nlp import analyze_entities, translate_text
 
-logger = logging.getLogger(__name__)
+logger: logging.Logger = logging.getLogger(__name__)
 
-router = APIRouter(tags=["translation"])
+router: APIRouter = APIRouter(tags=["translation"])
 
 
 class TranslateRequest(BaseModel):
@@ -35,10 +35,10 @@ async def translate(request: TranslateRequest) -> TranslateResponse:
     Useful for translating action plans into the patient's language.
     """
     try:
-        result = translate_text(request.text, request.target_language)
+        result: dict = translate_text(request.text, request.target_language)
         return TranslateResponse(**result)
-    except Exception as e:
-        logger.error(f"Translation failed: {e}", exc_info=True)
+    except (GoogleAPIError, ValueError, KeyError) as e:
+        logger.error("Translation failed: %s", e, exc_info=True)
         raise HTTPException(status_code=500, detail="Translation failed.")
 
 
@@ -52,8 +52,8 @@ class EntitiesResponse(BaseModel):
 async def entities(request: TranslateRequest) -> EntitiesResponse:
     """Extract medical entities using Cloud Natural Language API."""
     try:
-        result = await analyze_entities(request.text)
+        result: list[dict] = await analyze_entities(request.text)
         return EntitiesResponse(entities=result)
-    except Exception as e:
-        logger.error(f"Entity analysis failed: {e}", exc_info=True)
+    except (GoogleAPIError, ValueError) as e:
+        logger.error("Entity analysis failed: %s", e, exc_info=True)
         raise HTTPException(status_code=500, detail="Entity analysis failed.")

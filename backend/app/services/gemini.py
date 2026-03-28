@@ -1,7 +1,13 @@
-"""Gemini AI service — single-call architecture for speed."""
+"""Gemini AI service — single-call architecture for speed.
+
+Provides two analysis modes:
+- analyze(): Single structured output call (~10s)
+- analyze_with_grounding(): Google Search verification (~25s)
+"""
 
 import asyncio
 import logging
+from typing import Any
 
 from google import genai
 from google.genai import types
@@ -12,7 +18,7 @@ from app.models.actions import ActionPlan
 
 logger = logging.getLogger(__name__)
 
-# Vertex AI client with explicit endpoint
+# Vertex AI client with explicit endpoint to bypass SDK routing issues
 client = genai.Client(
     vertexai=True,
     project=settings.gcp_project_id,
@@ -23,27 +29,39 @@ client = genai.Client(
     ),
 )
 
-MAX_RETRIES = 3
-RETRY_DELAY_SECONDS = 6
+MAX_RETRIES: int = 3
+RETRY_DELAY_SECONDS: int = 6
 
 
-async def _call(**kwargs):
-    """Gemini call with retry on 429."""
+async def _call(**kwargs: Any) -> types.GenerateContentResponse:
+    """Call Gemini API with automatic retry on rate-limit (429) errors.
+
+    Args:
+        **kwargs: Arguments passed to generate_content.
+
+    Returns:
+        The Gemini API response.
+
+    Raises:
+        ClientError: If the API call fails after all retries.
+    """
     for attempt in range(MAX_RETRIES):
         try:
             return await client.aio.models.generate_content(**kwargs)
         except ClientError as e:
             if "429" in str(e) and attempt < MAX_RETRIES - 1:
                 wait = RETRY_DELAY_SECONDS * (attempt + 1)
-                logger.warning(f"Rate limited, retry in {wait}s (attempt {attempt + 1})")
+                logger.warning(
+                    "Rate limited, retry in %ds (attempt %d/%d)",
+                    wait, attempt + 1, MAX_RETRIES,
+                )
                 await asyncio.sleep(wait)
             else:
                 raise
+    raise ClientError(429, "Max retries exceeded")
 
 
-# ── Single-shot prompt ──────────────────────────────────────────────
-
-SYSTEM_PROMPT = """You are CrisisLens, an AI emergency medicine triage system.
+SYSTEM_PROMPT: str = """You are CrisisLens, an AI emergency medicine triage system.
 
 Given ANY input (text, images of medications/injuries, audio), you must:
 
@@ -62,7 +80,21 @@ Rules:
 
 
 async def analyze(content_parts: list[types.Part]) -> ActionPlan:
-    """Single Gemini call: input → structured ActionPlan. ~8-12s."""
+    """Analyze input with a single Gemini call returning structured JSON.
+
+    This is the primary fast path (~8-12s). Takes multimodal content parts
+    (text, images, audio) and returns a complete ActionPlan.
+
+    Args:
+        content_parts: List of Gemini content parts (text/image/audio).
+
+    Returns:
+        A validated ActionPlan with triage level, actions, and sources.
+
+    Raises:
+        ClientError: If the Gemini API call fails.
+        ValidationError: If the response doesn't match the ActionPlan schema.
+    """
     logger.info("Analyzing with single-shot structured output")
 
     response = await _call(
@@ -82,21 +114,30 @@ async def analyze(content_parts: list[types.Part]) -> ActionPlan:
 
     result = ActionPlan.model_validate_json(response.text)
     logger.info(
-        f"Done: triage={result.triage_level}, "
-        f"actions={len(result.verified_actions)}, "
-        f"confidence={result.confidence_overall}"
+        "Done: triage=%s, actions=%d, confidence=%.2f",
+        result.triage_level, len(result.verified_actions), result.confidence_overall,
     )
     return result
 
 
 async def analyze_with_grounding(content_parts: list[types.Part]) -> ActionPlan:
-    """Two-call path: Search Grounding → structured output. ~20-25s.
+    """Analyze with Google Search Grounding for verified recommendations.
 
-    Used when deeper verification is requested.
+    Two-call path (~20-25s): first grounds analysis via web search,
+    then structures into ActionPlan JSON.
+
+    Args:
+        content_parts: List of Gemini content parts (text/image/audio).
+
+    Returns:
+        A validated ActionPlan verified against medical guidelines.
+
+    Raises:
+        ClientError: If either Gemini API call fails.
+        ValidationError: If the response doesn't match the ActionPlan schema.
     """
     logger.info("Analyzing with Google Search Grounding")
 
-    # Call 1: Grounded analysis (unstructured)
     grounded = await _call(
         model="gemini-2.5-flash",
         contents=[
@@ -115,7 +156,6 @@ async def analyze_with_grounding(content_parts: list[types.Part]) -> ActionPlan:
         ),
     )
 
-    # Call 2: Structure into JSON (fast)
     response = await _call(
         model="gemini-2.5-flash",
         contents=[f"""{SYSTEM_PROMPT}
@@ -133,8 +173,7 @@ Convert the above into the structured JSON action plan."""],
 
     result = ActionPlan.model_validate_json(response.text)
     logger.info(
-        f"Done (grounded): triage={result.triage_level}, "
-        f"actions={len(result.verified_actions)}, "
-        f"confidence={result.confidence_overall}"
+        "Done (grounded): triage=%s, actions=%d, confidence=%.2f",
+        result.triage_level, len(result.verified_actions), result.confidence_overall,
     )
     return result

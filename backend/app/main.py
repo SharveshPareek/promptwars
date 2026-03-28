@@ -5,7 +5,7 @@ and Google Cloud service integrations.
 """
 
 import logging
-import os
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -23,29 +23,32 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
-logger = logging.getLogger(__name__)
+logger: logging.Logger = logging.getLogger(__name__)
 
 # Try to set up Google Cloud Logging in production
 if settings.environment == "production":
     try:
         import google.cloud.logging
 
-        cloud_client = google.cloud.logging.Client(project=settings.gcp_project_id)
+        cloud_client: google.cloud.logging.Client = google.cloud.logging.Client(
+            project=settings.gcp_project_id
+        )
         cloud_client.setup_logging(log_level=logging.INFO)
         logger.info("Google Cloud Logging initialized")
-    except Exception as e:
-        logger.warning(f"Could not initialize Cloud Logging: {e}")
+    except (ImportError, OSError) as e:
+        logger.warning("Could not initialize Cloud Logging: %s", e)
 
 # Rate limiter
-limiter = Limiter(key_func=get_remote_address)
+limiter: Limiter = Limiter(key_func=get_remote_address)
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Application startup and shutdown events."""
     logger.info(
-        f"CrisisLens API starting (env={settings.environment}, "
-        f"project={settings.gcp_project_id})"
+        "CrisisLens API starting (env=%s, project=%s)",
+        settings.environment,
+        settings.gcp_project_id,
     )
     yield
     logger.info("CrisisLens API shutting down")
@@ -68,7 +71,7 @@ app.add_middleware(
     allow_origins=settings.allowed_origins_list,
     allow_credentials=True,
     allow_methods=["GET", "POST", "OPTIONS"],
-    allow_headers=["*"],
+    allow_headers=["Content-Type", "Authorization"],
     max_age=600,
 )
 
@@ -81,7 +84,7 @@ app.include_router(translate.router, prefix="/api")
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """Catch unhandled exceptions and return a safe error response."""
-    logger.error(f"Unhandled exception: {exc}", exc_info=True)
+    logger.error("Unhandled exception: %s", exc, exc_info=True)
     return JSONResponse(
         status_code=500,
         content={"detail": "Internal server error"},

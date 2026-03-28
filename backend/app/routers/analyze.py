@@ -1,30 +1,31 @@
-"""Analysis endpoint — single Gemini call with SSE and caching."""
+"""Analysis endpoint -- single Gemini call with SSE and caching."""
 
 import asyncio
 import collections
 import hashlib
 import json
 import logging
+from typing import AsyncGenerator, Optional
 from uuid import uuid4
-from typing import Optional
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
 from fastapi.responses import StreamingResponse
+from google.api_core.exceptions import GoogleAPIError
 from google.genai import types
 
 from app.config import settings
-from app.services.gemini import analyze as gemini_analyze
 from app.services.firestore import save_session
+from app.services.gemini import analyze as gemini_analyze
 
-logger = logging.getLogger(__name__)
+logger: logging.Logger = logging.getLogger(__name__)
 
-router = APIRouter(tags=["analysis"])
+router: APIRouter = APIRouter(tags=["analysis"])
 
 # LRU cache with max 128 entries to prevent unbounded memory growth
-MAX_CACHE_SIZE = 128
+MAX_CACHE_SIZE: int = 128
 _cache: collections.OrderedDict[str, dict] = collections.OrderedDict()
 
-ALLOWED_MIME_TYPES = {
+ALLOWED_MIME_TYPES: set[str] = {
     "image/jpeg", "image/png", "image/webp", "image/gif",
     "audio/mpeg", "audio/mp3", "audio/wav", "audio/webm", "audio/ogg",
     "application/pdf",
@@ -32,6 +33,14 @@ ALLOWED_MIME_TYPES = {
 
 
 def _validate_file(file: UploadFile) -> None:
+    """Validate that the uploaded file has an allowed MIME type.
+
+    Args:
+        file: The uploaded file to validate.
+
+    Raises:
+        HTTPException: If the file type is not in ALLOWED_MIME_TYPES.
+    """
     if file.content_type and file.content_type not in ALLOWED_MIME_TYPES:
         raise HTTPException(
             status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
@@ -41,7 +50,8 @@ def _validate_file(file: UploadFile) -> None:
 
 def _cache_key(text: str, sizes: list[int]) -> str:
     """Generate a short hash key from input text and file sizes."""
-    return hashlib.sha256(f"{text}|{'|'.join(map(str, sizes))}".encode()).hexdigest()[:16]
+    raw: str = f"{text}|{'|'.join(map(str, sizes))}"
+    return hashlib.sha256(raw.encode()).hexdigest()[:16]
 
 
 def _cache_set(key: str, value: dict) -> None:
@@ -60,9 +70,20 @@ def _sse(event: str, data: dict) -> str:
 async def _read_parts(
     text: Optional[str], files: Optional[list[UploadFile]]
 ) -> tuple[list[types.Part], list[int]]:
-    """Validate and read all input into Gemini content parts."""
-    has_text = text and text.strip()
-    has_files = files and len(files) > 0
+    """Validate and read all input into Gemini content parts.
+
+    Args:
+        text: Optional text input from the user.
+        files: Optional list of uploaded files.
+
+    Returns:
+        A tuple of (parts, sizes) for Gemini analysis.
+
+    Raises:
+        HTTPException: If no input is provided or a file exceeds size limits.
+    """
+    has_text: bool = bool(text and text.strip())
+    has_files: bool = bool(files and len(files) > 0)
     if not has_text and not has_files:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Input required.")
 
@@ -74,7 +95,7 @@ async def _read_parts(
     if has_files:
         for f in files:
             _validate_file(f)
-            data = await f.read()
+            data: bytes = await f.read()
             if len(data) > settings.max_file_size_bytes:
                 raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
                                     detail=f"File too large (max {settings.max_file_size_mb}MB).")
@@ -89,27 +110,29 @@ async def analyze_stream(
     text: Optional[str] = Form(None),
     files: Optional[list[UploadFile]] = File(None),
 ) -> StreamingResponse:
-    """SSE endpoint — single Gemini call, streamed status updates."""
+    """SSE endpoint -- single Gemini call, streamed status updates."""
     parts, sizes = await _read_parts(text, files)
-    key = _cache_key(text or "", sizes)
+    key: str = _cache_key(text or "", sizes)
 
-    # Cache hit → instant
+    # Cache hit -> instant
     if key in _cache:
-        async def cached():
+        async def cached() -> AsyncGenerator[str, None]:
+            """Yield cached SSE events."""
             yield _sse("status", {"stage": "cached", "message": "Loaded from cache"})
             yield _sse("result", _cache[key])
             yield _sse("done", {"session_id": _cache[key]["session_id"]})
         return StreamingResponse(cached(), media_type="text/event-stream")
 
-    async def stream():
+    async def stream() -> AsyncGenerator[str, None]:
+        """Yield SSE events for a live Gemini analysis."""
         try:
             yield _sse("status", {"stage": "analyzing", "message": "Analyzing with Gemini AI..."})
 
-            # ONE Gemini call → full ActionPlan
+            # ONE Gemini call -> full ActionPlan
             action_plan = await gemini_analyze(parts)
 
-            session_id = str(uuid4())
-            result = {
+            session_id: str = str(uuid4())
+            result: dict = {
                 "session_id": session_id,
                 "action_plan": action_plan.model_dump(),
             }
@@ -126,8 +149,8 @@ async def analyze_stream(
             yield _sse("result", result)
             yield _sse("done", {"session_id": session_id})
 
-        except Exception as e:
-            logger.error(f"Analysis failed: {e}", exc_info=True)
+        except (GoogleAPIError, ValueError, RuntimeError) as e:
+            logger.error("Analysis failed: %s", e, exc_info=True)
             yield _sse("error", {"message": "Analysis failed. Please try again."})
 
     return StreamingResponse(stream(), media_type="text/event-stream")
@@ -138,20 +161,20 @@ async def analyze_sync(
     text: Optional[str] = Form(None),
     files: Optional[list[UploadFile]] = File(None),
 ) -> dict:
-    """Non-streaming fallback."""
+    """Non-streaming fallback for analysis without SSE support."""
     parts, sizes = await _read_parts(text, files)
-    key = _cache_key(text or "", sizes)
+    key: str = _cache_key(text or "", sizes)
 
     if key in _cache:
         return _cache[key]
 
     try:
         action_plan = await gemini_analyze(parts)
-        session_id = str(uuid4())
-        result = {"session_id": session_id, "action_plan": action_plan.model_dump()}
+        session_id: str = str(uuid4())
+        result: dict = {"session_id": session_id, "action_plan": action_plan.model_dump()}
         _cache_set(key, result)
         await save_session(session_id=session_id, intake_data={}, action_plan=action_plan.model_dump())
         return result
-    except Exception as e:
-        logger.error(f"Analysis failed: {e}", exc_info=True)
+    except (GoogleAPIError, ValueError, RuntimeError) as e:
+        logger.error("Analysis failed: %s", e, exc_info=True)
         raise HTTPException(status_code=500, detail="Analysis failed. Please try again.")
