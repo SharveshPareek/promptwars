@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "skills": {
+    "gcp-development": {
+      "source": "mindrally/skills",
+      "sourceType": "github",
+      "computedHash": "b6cf28e3482887756f61caddf5f35535bc7098f58aeb36fb0785740560890980"
+    },
+    "gcp-expert": {
+      "source": "personamanagmentlayer/pcl",
+      "sourceType": "github",
+      "computedHash": "1a7d44cd7c1747f8fbba178010fb1daa2b6879b11a9364e167e83125837f8293"
+    },
+    "hackathon-code-implementer": {
+      "source": "bernieweb3/hackathon-ai-devkit",
+      "sourceType": "github",
+      "computedHash": "5bcc5901620852c984b707e2dec7157dff5cc14e01fa1e0617df638ac63d371e"
+    },
+    "ui-ux-pro-max": {
+      "source": "nextlevelbuilder/ui-ux-pro-max-skill",
+      "sourceType": "github",
+      "computedHash": "6337038fe1fe6bbe1b9f252ab678ee575859190bab6f0f246f4061824eb40875"
+    }
+  }
+}
