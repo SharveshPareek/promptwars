@@ -1,11 +1,13 @@
 """Gemini AI service - handles all 3 pipelines via google-genai SDK."""
 
+import asyncio
 import json
 import logging
 from typing import Any
 
 from google import genai
 from google.genai import types
+from google.genai.errors import ClientError
 
 from app.config import settings
 from app.models.intake import IntakeResult
@@ -23,6 +25,24 @@ else:
         project=settings.gcp_project_id,
         location=settings.gcp_location,
     )
+
+MAX_RETRIES = 3
+RETRY_DELAY_SECONDS = 6
+
+
+async def _generate_with_retry(**kwargs):
+    """Call Gemini with automatic retry on rate limit (429) errors."""
+    for attempt in range(MAX_RETRIES):
+        try:
+            return await _generate_with_retry(**kwargs)
+        except ClientError as e:
+            if "429" in str(e) and attempt < MAX_RETRIES - 1:
+                wait = RETRY_DELAY_SECONDS * (attempt + 1)
+                logger.warning(f"Rate limited, retrying in {wait}s (attempt {attempt + 1})")
+                await asyncio.sleep(wait)
+            else:
+                raise
+
 
 # --- System Prompts ---
 
@@ -72,7 +92,7 @@ async def parse_intake(content_parts: list[types.Part]) -> IntakeResult:
     """
     logger.info("Pipeline 1: Starting intake parsing")
 
-    response = await client.aio.models.generate_content(
+    response = await _generate_with_retry(
         model="gemini-2.5-flash",
         contents=[
             types.Content(
@@ -107,7 +127,7 @@ async def reason(intake: IntakeResult) -> ReasoningResult:
 
 Think step-by-step through established medical protocols and provide your detailed assessment."""
 
-    response = await client.aio.models.generate_content(
+    response = await _generate_with_retry(
         model="gemini-2.5-flash",
         contents=[prompt],
         config=types.GenerateContentConfig(
@@ -143,7 +163,7 @@ async def verify_actions(
 Verify each action and produce the final verified action plan."""
 
     # Step 1: Use Google Search Grounding to verify (no structured output)
-    grounded_response = await client.aio.models.generate_content(
+    grounded_response = await _generate_with_retry(
         model="gemini-2.5-flash",
         contents=[prompt + "\n\nSearch the web to verify these medical recommendations."],
         config=types.GenerateContentConfig(
@@ -169,7 +189,7 @@ verified_actions (list of priority/action/reasoning/confidence/source/do_not),
 what_not_to_do (list), call_emergency (bool), emergency_number, verification_sources (list),
 confidence_overall (float 0-1)."""
 
-    response = await client.aio.models.generate_content(
+    response = await _generate_with_retry(
         model="gemini-2.5-flash",
         contents=[structure_prompt],
         config=types.GenerateContentConfig(
