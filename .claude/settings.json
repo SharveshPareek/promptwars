@@ -88,7 +88,10 @@
       "Bash(lsof -i :5173)",
       "Bash(\"/c/Users/Admin/AppData/Local/Google/Cloud SDK/google-cloud-sdk/bin/gcloud\" run revisions list --service crisislens-api --region us-central1 --project coral-balancer-491605-i0 --limit 2)",
       "mcp__playwright__playwright_navigate",
-      "Bash(npx playwright install chromium)"
+      "Bash(npx playwright install chromium)",
+      "Bash(\"/c/Users/Admin/AppData/Local/Google/Cloud SDK/google-cloud-sdk/bin/gcloud\" services enable translate.googleapis.com language.googleapis.com --project coral-balancer-491605-i0)",
+      "Bash(pip install google-cloud-translate==3.18.0 google-cloud-language==2.15.0)",
+      "Bash(python -m pytest tests/ -v --tb=short)"
     ]
   }
 }

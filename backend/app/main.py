@@ -16,7 +16,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
 from app.config import settings
-from app.routers import analyze, health
+from app.routers import analyze, health, translate
 
 # Configure structured logging
 logging.basicConfig(
@@ -75,6 +75,7 @@ app.add_middleware(
 # Routers
 app.include_router(health.router, prefix="/health")
 app.include_router(analyze.router, prefix="/api")
+app.include_router(translate.router, prefix="/api")
 
 
 @app.exception_handler(Exception)
