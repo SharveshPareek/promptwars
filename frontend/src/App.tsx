@@ -6,11 +6,10 @@ import { ActionPanel } from './components/ActionPanel';
 import { useAnalyze } from './hooks/useAnalyze';
 
 function App() {
-  const { result, loading, error, analyze } = useAnalyze();
+  const { result, intake, loading, stage, stageMessage, error, analyze } = useAnalyze();
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Skip to content link for accessibility */}
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:bg-blue-600 focus:text-white focus:px-4 focus:py-2 focus:rounded"
@@ -25,14 +24,18 @@ function App() {
         className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6"
       >
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[calc(100vh-140px)]">
-          {/* Input Panel */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 overflow-y-auto">
             <InputPanel onSubmit={analyze} loading={loading} />
           </div>
-
-          {/* Output Panel */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 overflow-y-auto">
-            <ActionPanel result={result} loading={loading} error={error} />
+            <ActionPanel
+              result={result}
+              intake={intake}
+              loading={loading}
+              stage={stage}
+              stageMessage={stageMessage}
+              error={error}
+            />
           </div>
         </div>
       </main>
